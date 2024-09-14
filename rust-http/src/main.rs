@@ -1,81 +1,211 @@
-use std::{
-    io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
-};
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use log::{info, error};
+use env_logger;
+use uuid::Uuid; 
 
+// Struct to represent an HTTP request
 #[derive(Debug)]
 struct HttpRequest {
     method: String,
     path: String,
-    headers: Vec<String>,
+    _headers: Vec<String>,
     body: String,
+    cookie: Option<String>,  
+}
+
+// Struct to represent a client
+struct Client {
+    stream: TcpStream,
+}
+
+// Main server struct with session management
+struct Server {
+    sessions: HashMap<String, String>, 
+}
+
+impl Server {
+    fn new() -> Self {
+        Self {
+            sessions: HashMap::new(),
+        }
+    }
+
+    fn handle_cookie(&mut self, request: &HttpRequest) -> String {
+        if let Some(cookie) = &request.cookie {
+            if let Some(session_data) = self.sessions.get(cookie) {
+                println!("Existing session for cookie: {} -> {}", cookie, session_data);
+                return cookie.clone(); // Return the existing session ID
+            }
+        }
+
+        // If no valid session, create a new one
+        let session_id = Uuid::new_v4().to_string();  
+        self.sessions.insert(session_id.clone(), "user_data".to_string());  
+        println!("New session created: {}", session_id);
+        
+        // Return the new session ID and set it in the Set-Cookie header
+        session_id
+    }
+
+    fn run(server: Arc<Mutex<Server>>) -> Result<(), Box<dyn std::error::Error>> {
+        let listener = TcpListener::bind("127.0.0.1:8080")?;  
+        info!("Server running on port 8080");
+
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    let server_clone = Arc::clone(&server); 
+                    thread::spawn(move || {
+                        let mut client = Client { stream };
+                        client.handle(server_clone);
+                    });
+                }
+                Err(e) => error!("Connection failed: {}", e),
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl Client {
+    // Handle the client connection
+    fn handle(&mut self, server: Arc<Mutex<Server>>) {
+        if let Some(request) = self.parse_request() {
+            // Handle the session cookie
+            let mut server_lock = server.lock().unwrap();  // Lock the server for exclusive access
+            let session_id = server_lock.handle_cookie(&request);
+            drop(server_lock);  // Release the lock once done
+
+            // Handle request based on method
+            let response = match request.method.as_str() {
+                "GET" => handle_get(&request.path),
+                "POST" => handle_post(&request.body),
+                "PUT" => handle_put(&request.body),
+                "DELETE" => handle_delete(&request.path),
+                "PATCH" => handle_patch(&request.body),
+                _ => handle_method_not_allowed(),
+            };
+
+            // Add Set-Cookie header if session ID is new
+            let full_response = format!(
+                "{}\r\nSet-Cookie: sessionId={}; Path=/\r\n\r\n",
+                response, session_id
+            );
+
+            // Send the response back to the client
+            if let Err(e) = self.send_response(&full_response) {
+                eprintln!("Failed to send response: {}", e);
+            }
+
+            // Log the response
+            println!("Sent Response: {}", full_response);
+        }
+    }
+
+    // Parse the incoming request and extract cookie if available
+    fn parse_request(&mut self) -> Option<HttpRequest> {
+        let mut buffer = [0; 1024];
+        let bytes_read = match self.stream.read(&mut buffer) {
+            Ok(bytes_read) => bytes_read,
+            Err(e) => {
+                eprintln!("Failed to read from stream: {}", e);
+                return None;
+            }
+        };
+    
+        let request_str = String::from_utf8_lossy(&buffer[..bytes_read]);
+        let mut headers_and_body = request_str.split("\r\n\r\n");
+    
+        let header_part = headers_and_body.next().unwrap_or_default();
+        if header_part.is_empty() {
+            // Malformed request: No headers
+            eprintln!("Malformed request: No headers.");
+            return None;
+        }
+    
+        let body_part = headers_and_body.next().unwrap_or_default().to_string();
+    
+        let mut header_lines = header_part.lines();
+        let request_line = header_lines.next().unwrap_or_default();
+    
+        let mut request_parts = request_line.split_whitespace();
+        let method = request_parts.next().unwrap_or("").to_string();
+        if method.is_empty() {
+            // Malformed request: No HTTP method
+            eprintln!("Malformed request: No HTTP method.");
+            return None;
+        }
+    
+        let path = request_parts.next().unwrap_or("").to_string();
+        let _headers: Vec<String> = header_lines.map(|h| h.to_string()).collect();
+    
+        // Extract cookie from headers if present
+        let cookie_header = _headers.iter().find(|h| h.starts_with("Cookie"));
+        let cookie = cookie_header.and_then(|h| {
+            h.split('=').nth(1).map(|c| c.trim().to_string()) // Extract the sessionId value
+        });
+    
+        Some(HttpRequest {
+            method,
+            path,
+            _headers,
+            body: body_part,
+            cookie,  // Include the cookie if available
+        })
+    }
+    
+    // Send the response back to the client
+    fn send_response(&mut self, response: &str) -> std::io::Result<()> {
+        self.stream.write_all(response.as_bytes())?;
+        self.stream.flush()
+    }
+}
+
+// Function to handle GET requests (prints path for debugging)
+fn handle_get(path: &str) -> String {
+    println!("Handling GET request for path: {}", path);  // Log the request path
+    format!("HTTP/1.1 200 OK\r\n\r\nGET request received for path: {}", path)
+}
+
+// Function to handle POST requests
+fn handle_post(body: &str) -> String {
+    format!("HTTP/1.1 200 OK\r\n\r\nPOST received with body: {}", body)
+}
+
+// Function to handle PUT requests
+fn handle_put(body: &str) -> String {
+    format!("HTTP/1.1 200 OK\r\n\r\nPUT received with body: {}", body)
+}
+
+// Function to handle DELETE requests (prints path for debugging)
+fn handle_delete(path: &str) -> String {
+    println!("Handling DELETE request for path: {}", path);  // Log the request path
+    format!("HTTP/1.1 200 OK\r\n\r\nDELETE request received for path: {}", path)
+}
+
+// Function to handle UPDATE (PATCH) requests
+fn handle_patch(body: &str) -> String {
+    format!("HTTP/1.1 200 OK\r\n\r\nPATCH received with body: {}", body)
+}
+
+// Function to handle unsupported methods
+fn handle_method_not_allowed() -> String {
+    "HTTP/1.1 405 Method Not Allowed\r\n\r\nMethod not allowed".to_string()
 }
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-    println!("Servidor escuchando en http://127.0.0.1:8080");
+    // Initialize logger
+    env_logger::init();
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        handle_connection(stream);
+    // Use Arc and Mutex to share the server across threads
+    let server = Arc::new(Mutex::new(Server::new()));
+
+    if let Err(e) = Server::run(server) {
+        error!("Server error: {}", e);
     }
-}
-
-fn handle_connection(mut stream: TcpStream) {
-    let mut buf_reader = BufReader::new(&mut stream);
-    let mut request_lines = Vec::new();
-
-    // Leer las líneas de la solicitud sin consumir buf_reader
-    for line in buf_reader.by_ref().lines() {
-        let line = line.unwrap();
-        if line.is_empty() {
-            break;
-        }
-        request_lines.push(line);
-    }
-
-    // Extraer el método y la ruta de la primera línea del request
-    let first_line = &request_lines[0];
-    let parts: Vec<&str> = first_line.split_whitespace().collect();
-    let method = parts[0].to_string();
-    let path = parts[1].to_string();
-
-    // Crear el struct HttpRequest
-    let mut request = HttpRequest {
-        method,
-        path,
-        headers: request_lines[1..].to_vec(), // Agregar las cabeceras
-        body: String::new(),
-    };
-
-    // Leer el cuerpo si es POST o PUT
-    if request.method == "POST" || request.method == "PUT" {
-        if let Some(content_length_line) = request.headers.iter().find(|line| line.starts_with("Content-Length")) {
-            let content_length: usize = content_length_line
-                .split(": ")
-                .nth(1)
-                .unwrap()
-                .trim()
-                .parse()
-                .unwrap();
-
-            if content_length > 0 {
-                buf_reader.take(content_length as u64).read_to_string(&mut request.body).unwrap();
-            }
-        }
-    }
-
-    println!("Request: {:#?}", request);
-
-    let response = match request.method.as_str() {
-        "GET" => format!("HTTP/1.1 200 OK\r\n\r\nGET recibido en la ruta: {}", request.path),
-        "POST" => format!("HTTP/1.1 200 OK\r\n\r\nPOST recibido con cuerpo: {}", request.body),
-        "PUT" => format!("HTTP/1.1 200 OK\r\n\r\nPUT recibido con cuerpo: {}", request.body),
-        "DELETE" => format!("HTTP/1.1 200 OK\r\n\r\nDELETE recibido en la ruta: {}", request.path),
-        "UPDATE" => "HTTP/1.1 200 OK\r\n\r\nUPDATE recibido".to_string(),
-        _ => "HTTP/1.1 405 Method Not Allowed\r\n\r\nMétodo no soportado".to_string(),
-    };    
-
-    stream.write(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
 }
