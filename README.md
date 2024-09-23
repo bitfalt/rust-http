@@ -6,7 +6,7 @@
 
 - Greivin Mauricio Fernández Brizuela c.2022437510
 - Daniel Alonso Garbanzo Carvajal c.2022117129
-- Ericka Michelle Cerdas Mejias c.
+- Ericka Michelle Cerdas Mejias c.2022138199
 
 ** IC-6600 -- Principios de Sistemas Operativos
 * Fecha de entrega: 4 de octubre
