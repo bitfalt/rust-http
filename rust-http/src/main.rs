@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
-use std::thread;
-use log::{info, error};
+use log::{error, info};
 use env_logger;
-use uuid::Uuid; 
+use uuid::Uuid;
+use threadpool::ThreadPool;
 
 // Struct to represent an HTTP request
 #[derive(Debug)]
@@ -14,7 +14,7 @@ struct HttpRequest {
     path: String,
     _headers: Vec<String>,
     body: String,
-    cookie: Option<String>,  
+    cookie: Option<String>,
 }
 
 // Struct to represent a client
@@ -24,7 +24,7 @@ struct Client {
 
 // Main server struct with session management
 struct Server {
-    sessions: HashMap<String, String>, 
+    sessions: HashMap<String, String>,
 }
 
 impl Server {
@@ -43,23 +43,26 @@ impl Server {
         }
 
         // If no valid session, create a new one
-        let session_id = Uuid::new_v4().to_string();  
-        self.sessions.insert(session_id.clone(), "user_data".to_string());  
+        let session_id = Uuid::new_v4().to_string();
+        self.sessions.insert(session_id.clone(), "user_data".to_string());
         println!("New session created: {}", session_id);
-        
+
         // Return the new session ID and set it in the Set-Cookie header
         session_id
     }
 
     fn run(server: Arc<Mutex<Server>>) -> Result<(), Box<dyn std::error::Error>> {
-        let listener = TcpListener::bind("127.0.0.1:8080")?;  
+        let listener = TcpListener::bind("127.0.0.1:8080")?;
         info!("Server running on port 8080");
+
+        // Create a thread pool with 4 threads
+        let pool = ThreadPool::new(4);
 
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
-                    let server_clone = Arc::clone(&server); 
-                    thread::spawn(move || {
+                    let server_clone = Arc::clone(&server);
+                    pool.execute(move || {
                         let mut client = Client { stream };
                         client.handle(server_clone);
                     });
@@ -77,9 +80,9 @@ impl Client {
     fn handle(&mut self, server: Arc<Mutex<Server>>) {
         if let Some(request) = self.parse_request() {
             // Handle the session cookie
-            let mut server_lock = server.lock().unwrap();  // Lock the server for exclusive access
+            let mut server_lock = server.lock().unwrap(); // Lock the server for exclusive access
             let session_id = server_lock.handle_cookie(&request);
-            drop(server_lock);  // Release the lock once done
+            drop(server_lock); // Release the lock once done
 
             // Handle request based on method
             let response = match request.method.as_str() {
@@ -117,22 +120,22 @@ impl Client {
                 return None;
             }
         };
-    
+
         let request_str = String::from_utf8_lossy(&buffer[..bytes_read]);
         let mut headers_and_body = request_str.split("\r\n\r\n");
-    
+
         let header_part = headers_and_body.next().unwrap_or_default();
         if header_part.is_empty() {
             // Malformed request: No headers
             eprintln!("Malformed request: No headers.");
             return None;
         }
-    
+
         let body_part = headers_and_body.next().unwrap_or_default().to_string();
-    
+
         let mut header_lines = header_part.lines();
         let request_line = header_lines.next().unwrap_or_default();
-    
+
         let mut request_parts = request_line.split_whitespace();
         let method = request_parts.next().unwrap_or("").to_string();
         if method.is_empty() {
@@ -140,25 +143,25 @@ impl Client {
             eprintln!("Malformed request: No HTTP method.");
             return None;
         }
-    
+
         let path = request_parts.next().unwrap_or("").to_string();
         let _headers: Vec<String> = header_lines.map(|h| h.to_string()).collect();
-    
+
         // Extract cookie from headers if present
         let cookie_header = _headers.iter().find(|h| h.starts_with("Cookie"));
         let cookie = cookie_header.and_then(|h| {
             h.split('=').nth(1).map(|c| c.trim().to_string()) // Extract the sessionId value
         });
-    
+
         Some(HttpRequest {
             method,
             path,
             _headers,
             body: body_part,
-            cookie,  // Include the cookie if available
+            cookie, // Include the cookie if available
         })
     }
-    
+
     // Send the response back to the client
     fn send_response(&mut self, response: &str) -> std::io::Result<()> {
         self.stream.write_all(response.as_bytes())?;
@@ -168,7 +171,7 @@ impl Client {
 
 // Function to handle GET requests (prints path for debugging)
 fn handle_get(path: &str) -> String {
-    println!("Handling GET request for path: {}", path);  // Log the request path
+    println!("Handling GET request for path: {}", path); // Log the request path
     format!("HTTP/1.1 200 OK\r\n\r\nGET request received for path: {}", path)
 }
 
@@ -184,11 +187,11 @@ fn handle_put(body: &str) -> String {
 
 // Function to handle DELETE requests (prints path for debugging)
 fn handle_delete(path: &str) -> String {
-    println!("Handling DELETE request for path: {}", path);  // Log the request path
+    println!("Handling DELETE request for path: {}", path); // Log the request path
     format!("HTTP/1.1 200 OK\r\n\r\nDELETE request received for path: {}", path)
 }
 
-// Function to handle UPDATE (PATCH) requests
+// Function to handle PATCH requests
 fn handle_patch(body: &str) -> String {
     format!("HTTP/1.1 200 OK\r\n\r\nPATCH received with body: {}", body)
 }
