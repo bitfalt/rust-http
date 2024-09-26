@@ -56,6 +56,98 @@ El servidor incorpora un manejo básico de errores para gestionar posibles probl
 - **Solicitudes Mal Formadas**: El servidor verifica si hay solicitudes incompletas o mal formadas y devuelve mensajes de error apropiados.
 - **Registro**: Utiliza las funciones de la crate `log` (`info`, `error`) para registrar las operaciones del servidor y los errores, lo que ayuda en la depuración y el monitoreo.
 
+## 8. Tipo de Thread Pool Utilizado
+Para mejorar la gestión de la concurrencia y controlar mejor el uso de los recursos del sistema, implementamos un Fixed Thread Pool utilizando la crate threadpool. Esto permite que el servidor maneje múltiples conexiones simultáneamente, limitando el número de hilos activos en un momento dado. Esto evita la sobrecarga del sistema que podría ocurrir si se crearan demasiados hilos dinámicamente.
+
+## 9. Pruebas del Fixed Thread Pool
+- **Prueba de Creación de Hilos**:
+      Objetivo:
+      Verificar que el Fixed Thread Pool crea hilos solo hasta el límite establecido y reutiliza los hilos existentes para nuevas solicitudes.
+
+      Procedimiento:
+         1. Configura el pool con un tamaño fijo, por ejemplo, 4 hilos: let pool = ThreadPool::new(4);.
+         2. Inicia el servidor.
+         3. Envía múltiples solicitudes (más de 4) concurrentemente usando curl o una herramienta similar:
+![Figura 1: Captura de los logs mostrando la reutilización de hilos](ruta/a/imagen.png)
+      bash
+      Copiar código
+      for i in {1..10}; do
+         curl -X GET http://127.0.0.1:8080/test-path &
+      done
+      Observa los logs y la consola para verificar el número de hilos activos.
+      Resultado Esperado:
+      Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales.
+
+      2. Prueba de Saturación del Pool
+      Objetivo:
+      Evaluar cómo responde el pool cuando todas las threads están ocupadas y llegan más solicitudes.
+
+      Procedimiento:
+
+      Configura el pool con un tamaño fijo de 4 hilos.
+      Envía 10 solicitudes concurrentes rápidas:
+      bash
+      Copiar código
+      for i in {1..10}; do
+         curl -X GET http://127.0.0.1:8080/test-path &
+      done
+      Monitorea la respuesta del servidor y el tiempo que toman las solicitudes en completarse.
+      Resultado Esperado:
+      Las primeras 4 solicitudes se procesan inmediatamente; las demás se encolan y se procesan a medida que los hilos se desocupan.
+
+      3. Prueba de Reutilización de Hilos
+      Objetivo:
+      Asegurarse de que los hilos se reutilizan para múltiples tareas sin ser destruidos y recreados.
+
+      Procedimiento:
+
+      Inicia el servidor con el Fixed Thread Pool.
+      Envía una serie de solicitudes espaciadas en el tiempo (cada 1 segundo).
+      bash
+      Copiar código
+      for i in {1..5}; do
+         curl -X GET http://127.0.0.1:8080/test-path &
+         sleep 1
+      done
+      Revisa los logs para asegurarte de que los mismos hilos están manejando las solicitudes.
+      Resultado Esperado:
+      Los hilos activos son reutilizados para cada nueva solicitud, sin necesidad de crear nuevos hilos.
+
+      4. Prueba de Tiempo de Respuesta Bajo Carga
+      Objetivo:
+      Medir si el tiempo de respuesta del servidor es estable cuando el pool está ocupado.
+
+      Procedimiento:
+
+      Configura el pool con un tamaño de 4 hilos.
+      Utiliza herramientas como Apache JMeter o scripts en curl para enviar 50 solicitudes concurrentes.
+      Mide los tiempos de respuesta promedio y máximo.
+      Resultado Esperado:
+      Los tiempos de respuesta deberían ser consistentes y no mostrar aumentos drásticos, indicando que el pool gestiona correctamente las tareas encoladas.
+
+      5. Prueba de Manejo de Errores
+      Objetivo:
+      Verificar que errores en una tarea no afectan la operación del pool y que los hilos continúan procesando nuevas solicitudes.
+
+      Procedimiento:
+
+      Introduce un error controlado en el manejo de una solicitud (por ejemplo, un panic).
+      Envía varias solicitudes concurrentes.
+      Observa si los hilos continúan operando después de que ocurra el error.
+      Resultado Esperado:
+      El pool sigue operando normalmente, y los hilos afectados se manejan adecuadamente sin afectar el rendimiento del pool.
+
+      6. Prueba de Límites del Pool
+      Objetivo:
+      Probar cómo el servidor se comporta al variar el tamaño del pool para determinar el tamaño óptimo bajo diferentes cargas.
+
+      Procedimiento:
+
+      Configura el pool con diferentes tamaños (2, 4, 8 hilos) en distintas ejecuciones.
+      Envía 20 solicitudes concurrentes en cada ejecución.
+      Compara el rendimiento y los tiempos de respuesta bajo cada configuración.
+      Resultado Esperado:
+      Documentar cómo los cambios en el tamaño del pool afectan el rendimiento, ayudando a determinar el tamaño óptimo para el servidor.
 ## 7. Instrucciones para Ejecutar el Servidor
 
 1. **Configuración**:
