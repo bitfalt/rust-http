@@ -61,34 +61,36 @@ Para mejorar la gestión de la concurrencia y controlar mejor el uso de los recu
 
 ## 9. Pruebas del Fixed Thread Pool
 - **Prueba de Creación de Hilos**:
-   Objetivo:
-   Verificar que el Fixed Thread Pool crea hilos solo hasta el límite establecido y reutiliza los hilos existentes para nuevas solicitudes.
+      Objetivo:
+      Verificar que el Fixed Thread Pool crea hilos solo hasta el límite establecido y reutiliza los hilos existentes para nuevas solicitudes.
 
-   Procedimiento:
-      1. Configura el pool con un tamaño fijo, por ejemplo, 4 hilos: let pool = ThreadPool::new(4);.
-      2. Inicia el servidor.
-      3. Envía múltiples solicitudes (más de 4) concurrentemente usando curl o una herramienta similar:
+      Procedimiento:
+         1. Configura el pool con un tamaño fijo, por ejemplo, 4 hilos: let pool = ThreadPool::new(4);.
+         2. Inicia el servidor.
+         3. Envía múltiples solicitudes (más de 4) concurrentemente usando curl o una herramienta similar:
    
-   Resultado Esperado:
-   Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales.
+      Resultado Esperado:
+      Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales.
 ![Figura 1: Comando prueba]()
 - **Prueba de Saturación del Pool**:
-   Objetivo:
-   Evaluar cómo responde el pool cuando todas las threads están ocupadas y llegan más solicitudes.
+      Objetivo:
+      Evaluar cómo responde el pool cuando todas las threads están ocupadas y llegan más solicitudes.
 
-   Procedimiento:
-      1. Envía 10 solicitudes concurrentes rápidas
-   Resultado Esperado:
-   Las primeras 4 solicitudes se procesan inmediatamente; las demás se encolan y se procesan a medida que los hilos se desocupan.
+      Procedimiento:
+         1. Envía 10 solicitudes concurrentes rápidas
+
+      Resultado Esperado:
+      Las primeras 4 solicitudes se procesan inmediatamente; las demás se encolan y se procesan a medida que los hilos se desocupan.
 
 - **Prueba de Reutilización de Hilos**:
-   Objetivo:
-   Asegurarse de que los hilos se reutilizan para múltiples tareas sin ser destruidos y recreados.
+      Objetivo:
+      Asegurarse de que los hilos se reutilizan para múltiples tareas sin ser destruidos y recreados.
 
-   Procedimiento:
-      1. Envía una serie de solicitudes espaciadas en el tiempo (cada 1 segundo).
-   Resultado Esperado:
-   Los hilos activos son reutilizados para cada nueva solicitud, sin necesidad de crear nuevos hilos.
+      Procedimiento:
+         1. Envía una serie de solicitudes espaciadas en el tiempo (cada 1 segundo).
+         
+      Resultado Esperado:
+      Los hilos activos son reutilizados para cada nueva solicitud, sin necesidad de crear nuevos hilos.
 
 ## 7. Instrucciones para Ejecutar el Servidor
 
