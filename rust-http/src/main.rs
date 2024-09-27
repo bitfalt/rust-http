@@ -6,6 +6,9 @@ use log::{error, info};
 use env_logger;
 use uuid::Uuid;
 use threadpool::ThreadPool;
+use std::sync::mpsc::channel;
+use std::thread;
+use std::time::Duration;
 
 // Struct to represent an HTTP request
 #[derive(Debug)]
@@ -199,6 +202,31 @@ fn handle_patch(body: &str) -> String {
 // Function to handle unsupported methods
 fn handle_method_not_allowed() -> String {
     "HTTP/1.1 405 Method Not Allowed\r\n\r\nMethod not allowed".to_string()
+}
+
+// Fixed Thread Pool Test
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_thread_creation(){
+        let pool = ThreadPool::new(4);
+        let (sender, receiver) = channel();
+        // Enviar 10 tareas para verificar la creación y reutilización de hilos
+        for i in 0..10 {
+            let sender = sender.clone();
+            pool.execute(move || {
+                thread::sleep(Duration::from_secs(1));
+                println!("Tarea {} ejecutada en un hilo.", i);
+                sender.send(()).expect("Error al enviar el mensaje");
+            });
+        }
+        // Espera a que todas las tareas terminen
+        for _ in 0..10 {
+            receiver.recv().expect("Error al recibir el mensaje");
+        }
+        println!("Prueba de creación de hilos completada.");
+    }
 }
 
 fn main() {
