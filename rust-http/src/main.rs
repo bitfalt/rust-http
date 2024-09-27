@@ -2,10 +2,12 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
+use std::env;
 use log::{error, info};
 use env_logger;
 use uuid::Uuid;
 use threadpool::ThreadPool;
+use serde_json;
 
 // Struct to represent an HTTP request
 #[derive(Debug)]
@@ -80,25 +82,34 @@ impl Client {
     fn handle(&mut self, server: Arc<Mutex<Server>>) {
         if let Some(request) = self.parse_request() {
             // Handle the session cookie
-            let mut server_lock = server.lock().unwrap(); // Lock the server for exclusive access
+            let mut server_lock = server.lock().unwrap();
             let session_id = server_lock.handle_cookie(&request);
-            drop(server_lock); // Release the lock once done
+            drop(server_lock);
+
+            // Parse JSON body if present
+            let json_body = if !request.body.is_empty() {
+                serde_json::from_str(&request.body).ok()
+            } else {
+                None
+            };
 
             // Handle request based on method
             let response = match request.method.as_str() {
                 "GET" => handle_get(&request.path),
-                "POST" => handle_post(&request.body),
-                "PUT" => handle_put(&request.body),
+                "POST" => handle_post(&request.path, json_body.as_ref()),
+                "PUT" => handle_put(&request.path, json_body.as_ref()),
                 "DELETE" => handle_delete(&request.path),
-                "PATCH" => handle_patch(&request.body),
+                "PATCH" => handle_patch(&request.path, json_body.as_ref()),
                 _ => handle_method_not_allowed(),
             };
 
             // Add Set-Cookie header if session ID is new
-            let full_response = format!(
-                "{}\r\nSet-Cookie: sessionId={}; Path=/\r\n\r\n",
-                response, session_id
-            );
+            // let full_response = format!(
+            //     "{}\r\nSet-Cookie: sessionId={}; Path=/\r\n\r\n",
+            //     response, session_id
+            // );
+
+            let full_response = response;
 
             // Send the response back to the client
             if let Err(e) = self.send_response(&full_response) {
@@ -169,31 +180,105 @@ impl Client {
     }
 }
 
-// Function to handle GET requests (prints path for debugging)
+use std::fs;
+use std::path::Path;
+
+// Function to handle GET requests
 fn handle_get(path: &str) -> String {
-    println!("Handling GET request for path: {}", path); // Log the request path
-    format!("HTTP/1.1 200 OK\r\n\r\nGET request received for path: {}", path)
+    println!("Handling GET request for path: {}", path);
+    let file_path = format!(".{}", path);
+    if Path::new(&file_path).exists() {
+        match fs::read_to_string(&file_path) {
+            Ok(contents) => format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{}", contents),
+            Err(_) => "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read file".to_string(),
+        }
+    } else {
+        "HTTP/1.1 404 Not Found\r\n\r\nFile not found".to_string()
+    }
 }
 
 // Function to handle POST requests
-fn handle_post(body: &str) -> String {
-    format!("HTTP/1.1 200 OK\r\n\r\nPOST received with body: {}", body)
+fn handle_post(path: &str, json_body: Option<&serde_json::Value>) -> String {
+    println!("Handling POST request for path: {}", path);
+    if let Some(data) = json_body {
+        // Process the JSON data
+        let file_path = format!(".{}", path);
+        match serde_json::to_string_pretty(data) {
+            Ok(json_string) => match fs::write(&file_path, json_string) {
+                Ok(_) => "HTTP/1.1 201 Created\r\n\r\nFile created successfully".to_string(),
+                Err(_) => "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to create file".to_string(),
+            },
+            Err(_) => "HTTP/1.1 400 Bad Request\r\n\r\nInvalid JSON data".to_string(),
+        }
+    } else {
+        "HTTP/1.1 400 Bad Request\r\n\r\nMissing JSON body".to_string()
+    }
 }
 
 // Function to handle PUT requests
-fn handle_put(body: &str) -> String {
-    format!("HTTP/1.1 200 OK\r\n\r\nPUT received with body: {}", body)
+fn handle_put(path: &str, json_body: Option<&serde_json::Value>) -> String {
+    println!("Handling PUT request for path: {}", path);
+    if let Some(data) = json_body {
+        // Process the JSON data
+        let file_path = format!(".{}", path);
+        match serde_json::to_string_pretty(data) {
+            Ok(json_string) => match fs::write(&file_path, json_string) {
+                Ok(_) => "HTTP/1.1 200 OK\r\n\r\nFile updated successfully".to_string(),
+                Err(_) => "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to update file".to_string(),
+            },
+            Err(_) => "HTTP/1.1 400 Bad Request\r\n\r\nInvalid JSON data".to_string(),
+        }
+    } else {
+        "HTTP/1.1 400 Bad Request\r\n\r\nMissing JSON body".to_string()
+    }
 }
 
-// Function to handle DELETE requests (prints path for debugging)
+// Function to handle DELETE requests
 fn handle_delete(path: &str) -> String {
-    println!("Handling DELETE request for path: {}", path); // Log the request path
-    format!("HTTP/1.1 200 OK\r\n\r\nDELETE request received for path: {}", path)
+    println!("Handling DELETE request for path: {}", path);
+    let file_path = format!(".{}", path);
+    if Path::new(&file_path).exists() {
+        match fs::remove_file(&file_path) {
+            Ok(_) => "HTTP/1.1 200 OK\r\n\r\nFile deleted successfully".to_string(),
+            Err(_) => "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to delete file".to_string(),
+        }
+    } else {
+        "HTTP/1.1 404 Not Found\r\n\r\nFile not found".to_string()
+    }
 }
 
 // Function to handle PATCH requests
-fn handle_patch(body: &str) -> String {
-    format!("HTTP/1.1 200 OK\r\n\r\nPATCH received with body: {}", body)
+fn handle_patch(path: &str, json_body: Option<&serde_json::Value>) -> String {
+    println!("Handling PATCH request for path: {}", path);
+    if let Some(data) = json_body {
+        // Process the JSON data
+        let file_path = format!(".{}", path);
+        if Path::new(&file_path).exists() {
+            match fs::read_to_string(&file_path) {
+                Ok(existing_content) => {
+                    let existing_json: serde_json::Value = serde_json::from_str(&existing_content).unwrap_or(serde_json::json!({}));
+                    let mut updated_json = existing_json;
+                    if let serde_json::Value::Object(obj) = &mut updated_json {
+                        if let serde_json::Value::Object(patch) = data {
+                            obj.extend(patch.clone());
+                        }
+                    }
+                    match serde_json::to_string_pretty(&updated_json) {
+                        Ok(json_string) => match fs::write(&file_path, json_string) {
+                            Ok(_) => "HTTP/1.1 200 OK\r\n\r\nFile patched successfully".to_string(),
+                            Err(_) => "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to patch file".to_string(),
+                        },
+                        Err(_) => "HTTP/1.1 400 Bad Request\r\n\r\nInvalid JSON data".to_string(),
+                    }
+                },
+                Err(_) => "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read file".to_string(),
+            }
+        } else {
+            "HTTP/1.1 404 Not Found\r\n\r\nFile not found".to_string()
+        }
+    } else {
+        "HTTP/1.1 400 Bad Request\r\n\r\nMissing JSON body".to_string()
+    }
 }
 
 // Function to handle unsupported methods
@@ -207,6 +292,8 @@ fn main() {
 
     // Use Arc and Mutex to share the server across threads
     let server = Arc::new(Mutex::new(Server::new()));
+
+    println!("Current working directory: {:?}", env::current_dir().unwrap());
 
     if let Err(e) = Server::run(server) {
         error!("Server error: {}", e);
