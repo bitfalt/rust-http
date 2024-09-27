@@ -71,7 +71,9 @@ Para mejorar la gestión de la concurrencia y controlar mejor el uso de los recu
    
       Resultado Esperado:
       Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales.
-![Figura 1: Resultado Prueba de creación de hilos](images/Prueba1Thread.png)
+<div align="center">
+    <img src="images/Prueba1Thread.png" alt="Figura 1: Resultado Prueba de creación de hilos" />
+</div>
 - **Prueba de Saturación del Pool**:
       Objetivo:
       Evaluar cómo responde el pool cuando todas las threads están ocupadas y llegan más solicitudes.
