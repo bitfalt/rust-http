@@ -70,8 +70,11 @@ Para mejorar la gestión de la concurrencia y controlar mejor el uso de los recu
          3. Envía múltiples solicitudes (más de 4) concurrentemente usando curl o una herramienta similar:
    
       Resultado Esperado:
-      Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales.
-![Figura 1: Comando prueba]()
+      Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales. 
+   <div align="center">
+      <img src="images/Prueba1Thread.png" alt="Figura 1: Resultado Prueba de creación de hilos" />
+      <p>Figura 1: Resultado Prueba de creación de hilos</p>
+   </div>
 - **Prueba de Saturación del Pool**:
       Objetivo:
       Evaluar cómo responde el pool cuando todas las threads están ocupadas y llegan más solicitudes.
@@ -81,18 +84,39 @@ Para mejorar la gestión de la concurrencia y controlar mejor el uso de los recu
 
       Resultado Esperado:
       Las primeras 4 solicitudes se procesan inmediatamente; las demás se encolan y se procesan a medida que los hilos se desocupan.
+   <div align="center">
+      <img src="images/Prueba2Thread.png" alt="Figura 2: Resultado Prueba de saturación del Pool" />
+      <p>Figura 2: Resultado Prueba de saturación del Pool</p>
+   </div>
 
-- **Prueba de Reutilización de Hilos**:
+- **Prueba de Tiempo de Respuesta Bajo Carga**:
       Objetivo:
-      Asegurarse de que los hilos se reutilizan para múltiples tareas sin ser destruidos y recreados.
+      Medir el tiempo que toma completar 50 tareas cuando el pool tiene 4 hilos.
 
       Procedimiento:
-         1. Envía una serie de solicitudes espaciadas en el tiempo (cada 1 segundo).
-         
-      Resultado Esperado:
-      Los hilos activos son reutilizados para cada nueva solicitud, sin necesidad de crear nuevos hilos.
+         1. Se envían 50 tareas, cada una simulando un trabajo de 100 milisegundos.
 
-## 7. Instrucciones para Ejecutar el Servidor
+      Resultado Esperado:
+      Las tareas deberían completarse en un tiempo aproximado de 5 segundos, considerando la limitación de hilos.
+   <div align="center">
+      <img src="images/Prueba3Thread.png" alt="Figura 3: Resultado Prueba de Tiempo de Respuesta Bajo Carga" />
+      <p>Figura 3: Resultado Prueba de Tiempo de Respuesta Bajo Carga</p>
+   </div>
+
+- **Prueba de Manejo de Errores**:
+      Objetivo:
+      Verificar que el pool continúa operando después de que se produce un error controlado en una tarea
+
+      Procedimiento:
+         1. Se envían 4 tareas, donde una de ellas provoca un pánico controlado.
+
+      Resultado Esperado:
+      La prueba debería capturar el error y permitir que las otras tareas se ejecuten correctamente.
+   <div align="center">
+      <img src="images/Prueba4Thread.png" alt="Figura 4: Resultado Prueba de Manejo de Errores" />
+      <p>Figura 4: Resultado Prueba de TManejo de Errores</p>
+   </div>
+## 7. Instrucciones para Ejecutar el Servido3
 
 1. **Configuración**:
    - Asegúrate de que Rust esté instalado en tu sistema. Si no lo está, puedes instalarlo desde [el sitio web oficial de Rust](https://www.rust-lang.org/).
