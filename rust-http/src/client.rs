@@ -22,7 +22,7 @@ impl Client {
             };
 
             // Handle request based on method
-            let response = match request.method.as_str() {
+            let mut response = match request.method.as_str() {
                 "GET" => handle_get(&request.path),
                 "POST" => handle_post(&request.path, json_body.as_ref()),
                 "PUT" => handle_put(&request.path, json_body.as_ref()),
@@ -32,12 +32,9 @@ impl Client {
             };
 
             // Add Set-Cookie header if session ID is new
-            // let full_response = format!(
-            //     "{}\r\nSet-Cookie: sessionId={}; Path=/\r\n\r\n",
-            //     response, session_id
-            // );
+            response.headers.insert("Set-Cookie".to_string(), format!("sessionId={}; Path=/", session_id));
 
-            let full_response = response;
+            let full_response = response.to_string();
 
             // Send the response back to the client
             if let Err(e) = self.send_response(&full_response) {

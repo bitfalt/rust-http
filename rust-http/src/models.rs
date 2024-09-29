@@ -11,6 +11,14 @@ pub struct HttpRequest {
     pub cookie: Option<String>,
 }
 
+// Struct ro represent an HTTP response
+#[derive(Debug)]
+pub struct HttpResponse {
+    pub status_code: u16,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
+}
+
 // Struct to represent a client
 pub struct Client {
     pub stream: TcpStream,
