@@ -100,7 +100,10 @@ To test the `run` function, we would need to refactor the code to add an identif
 - Can we force an error to check if the Connection failed is being displayed correctly?
 
 # Keywords
-To successfully made a unit test, we need to use the following keywords:
+To successfully make a unit test, we need to use the following keywords:
+
+**IF WE DON'T USE THESE KEYWORDS A TEST WILL ALWAYS PASS UNLESS IT PANICS SOMEWHERE ELSE**
+
 - `assert(expr, message)` this would panic if the expression is false, therefore failing the test. We can customize the panic error (message), however this is optional.
 - `assert_eq!(left, right, message)` this would panic if the left and right expressions aren't equal. We can customize the panic error (message), however this is optional.
 - `assert_ne!(left, right, message)` this would panic if the left and right expressions are equal. We can customize the panic error (message), however this is optional.
