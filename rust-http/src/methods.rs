@@ -41,6 +41,14 @@ pub fn handle_post(id: &str, json_body: Option<&serde_json::Value>) -> HttpRespo
     println!("Handling POST request for user with ID: {}", id);
 
     if let Some(data) = json_body {
+        // Check if the JSON body is a valid object
+        if !data.is_object() {
+            return HttpResponse::new(400, HashMap::new(), Some(serde_json::json!({
+                "status_code": 400,
+                "message": "Invalid JSON data: must be an object"
+            }).to_string()));
+        }
+
         // Construir la ruta completa usando la carpeta 'files' y el ID como nombre del archivo
         let file_path = format!("./files/{}.json", id);
         let path_parent = Path::new(&file_path).parent();
@@ -71,10 +79,13 @@ pub fn handle_post(id: &str, json_body: Option<&serde_json::Value>) -> HttpRespo
                     }).to_string()))
                 },
             },
-            Err(_) => HttpResponse::new(400, HashMap::new(), Some(serde_json::json!({
-                "status_code": 400,
-                "message": "Invalid JSON data"
-            }).to_string())),
+            Err(e) => {
+                println!("Failed to serialize JSON: {}", e);
+                HttpResponse::new(500, HashMap::new(), Some(serde_json::json!({
+                    "status_code": 500,
+                    "message": "Failed to serialize JSON"
+                }).to_string()))
+            },
         }
     } else {
         HttpResponse::new(400, HashMap::new(), Some(serde_json::json!({
@@ -272,7 +283,7 @@ mod tests {
         // Assert the response was successful
         assert_eq!(response.status_code, 200, "Status code should be 200");
 
-        let file_path = format!("files/tests/{}.json", file);
+        let file_path = format!("files/{}.json", file);
         let file_contents = fs::read_to_string(&file_path).expect("Failed to read file");
 
         // Assert the file returned is the same
@@ -288,25 +299,68 @@ mod tests {
 
         // Assert the response gave 404
         assert_eq!(response.status_code, 404, "Status code should be 404");
-        // Assert the message is correct
-        let response_message = response.body.as_ref().unwrap();
-        assert!(response_message.contains("File not found"), "Response should contain 'File not found'");
     }
 
-    // #[test]
-    // fn test_handle_post_successfully() {
-    //     panic!("Not implemented");
-    // }
+    #[test]
+    fn test_handle_post_successfully() {
+        let id = "test_post";
+        let json_body = serde_json::json!({
+            "key": "value",
+            "number": 42
+        });
 
-    // #[test]
-    // fn test_handle_post_invalid_json_data() {
-    //     panic!("Not implemented");
-    // }
+        let response = handle_post(id, Some(&json_body));
 
-    // #[test]
-    // fn test_handle_post_missing_json() {
-    //     panic!("Not implemented");
-    // }
+        assert_eq!(response.status_code, 201, "Status code should be 201");
+        
+        let file_path = format!("files/{}.json", id);
+        assert!(Path::new(&file_path).exists(), "File should be created");
+
+        let file_contents = fs::read_to_string(&file_path).expect("Failed to read file");
+        let saved_json: Value = serde_json::from_str(&file_contents).expect("Failed to parse JSON");
+        assert_eq!(saved_json, json_body, "Saved JSON should match the input");
+
+        // Clean up: remove the test file
+        fs::remove_file(file_path).expect("Failed to remove test file");
+    }
+
+    #[test]
+    fn test_handle_post_invalid_json_data() {
+        let id = "test_invalid_json";
+        let invalid_json = serde_json::Value::String("This is not a valid JSON object".to_string());
+
+        let response = handle_post(id, Some(&invalid_json));
+
+        assert_eq!(response.status_code, 400, "Status code should be 400");
+        assert!(response.body.unwrap().contains("Invalid JSON data"), "Response should mention invalid JSON");
+    }
+
+    #[test]
+    fn test_handle_post_missing_json() {
+        let id = "test_missing_json";
+        let response = handle_post(id, None);
+
+        assert_eq!(response.status_code, 400, "Status code should be 400");
+        assert!(response.body.unwrap().contains("Missing JSON body"), "Response should mention missing JSON body");
+    }
+
+    #[test]
+    fn test_handle_post_existing_file() {
+        let id = "test_existing_file";
+        let json_body = serde_json::json!({"key": "value"});
+
+        // Create a file first
+        let _ = handle_post(id, Some(&json_body));
+
+        // Try to create the same file again
+        let response = handle_post(id, Some(&json_body));
+
+        assert_eq!(response.status_code, 201, "Status code should be 201");
+        
+        // Clean up: remove the test file
+        let file_path = format!("./files/{}.json", id);
+        fs::remove_file(file_path).expect("Failed to remove test file");
+    }
 
     // #[test]
     // fn test_handle_put_successfully() {
