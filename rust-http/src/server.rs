@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
-use crate::models::{Server, Client, HttpRequest};
+use crate::request::HttpRequest;
+use crate::client::Client;
 use std::net::TcpListener;
 use threadpool::ThreadPool;
 use log::{error, info};
 
+// Main server struct with session management
+pub struct Server {
+    pub sessions: HashMap<String, String>,
+}
 
 impl Server {
     pub fn new() -> Self {

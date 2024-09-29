@@ -2,10 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::env;
 use log::error;
 use env_logger;
-
-use rust_http::models::Server;
-
-
+use rust_http::server::Server;
 
 fn main() {
     // Initialize logger

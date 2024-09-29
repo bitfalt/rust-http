@@ -1,9 +1,15 @@
 use std::sync::{Arc, Mutex};
-use crate::models::{HttpRequest, Server, Client};
+use crate::server::Server;
+use crate::request::HttpRequest;
 use serde_json;
 use crate::methods::{handle_get, handle_post, handle_put,handle_delete, handle_patch, handle_method_not_allowed};
 use std::io::{Read, Write};
+use std::net::TcpStream;
 
+// Struct to represent a client
+pub struct Client {
+    pub stream: TcpStream,
+}
 
 impl Client {
     // Handle the client connection

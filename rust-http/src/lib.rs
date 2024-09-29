@@ -1,4 +1,5 @@
 pub mod methods;
-pub mod models;
+pub mod request;
+pub mod response;
 pub mod client;
 pub mod server;
