@@ -3,9 +3,12 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use crate::request::HttpRequest;
 use crate::client::Client;
-use std::net::TcpListener;
+use std::net::{TcpStream, TcpListener};
 use threadpool::ThreadPool;
 use log::{error, info};
+use std::thread;
+use std::io::{Write, Read};
+use std::time::Duration;
 
 // Main server struct with session management
 pub struct Server {
@@ -18,7 +21,6 @@ impl Server {
             sessions: HashMap::new(),
         }
     }
-
     pub fn handle_cookie(&mut self, request: &HttpRequest) -> String {
         if let Some(cookie) = &request.cookie {
             if let Some(session_data) = self.sessions.get(cookie) {
@@ -64,95 +66,110 @@ impl Server {
 // Fixed Thread Pool Tests
 #[cfg(test)]
 mod tests {
-    use threadpool::ThreadPool;
-    use std::sync::mpsc::channel;
-    use std::thread;
-    use std::time::Duration;
-
+    use super::*;
+    //use crate::request::HttpRequest;
 
     #[test]
-    fn test_thread_creation(){
-        let pool = ThreadPool::new(4);
-        let (sender, receiver) = channel();
-        // Enviar 10 tareas para verificar la creación y reutilización de hilos
-        for i in 0..10 {
-            let sender = sender.clone();
-            pool.execute(move || {
-                thread::sleep(Duration::from_secs(1));
-                println!("Tarea {} ejecutada en un hilo.", i);
-                sender.send(()).expect("Error al enviar el mensaje");
-            });
-        }
-        // Espera a que todas las tareas terminen
-        for _ in 0..10 {
-            receiver.recv().expect("Error al recibir el mensaje");
-        }
-        println!("Prueba de creación de hilos completada.");
+    fn test_new_session_creation_without_cookie() {
+        // New server
+        let mut server = Server::new();
+
+        // Request without cookie 
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            _headers: vec![],
+            body: "".to_string(),
+            cookie: None,
+        };
+
+        // Generate cookie
+        let session_id = server.handle_cookie(&request);
+
+        // Verify that the new session has been created
+        assert!(server.sessions.contains_key(&session_id));
+        assert_eq!(server.sessions.get(&session_id).unwrap(), "user_data");
     }
     #[test]
-    fn test_pool_saturation() {
-        let pool = ThreadPool::new(4);
-        let (sender, receiver) = channel();
+    fn test_new_session_creation_existing_cookie() {
+        // New server
+        let mut server = Server::new();
+        
+        // Manual Session
+        server.sessions.insert("abc".to_string(), "user_data".to_string());
 
-        for i in 0..10 {
-            let sender = sender.clone();
-            pool.execute(move || {
-                println!("Ejecutando tarea {}...", i);
-                thread::sleep(Duration::from_secs(1)); // Simula trabajo de 1 segundo
-                sender.send(()).expect("Error al enviar el mensaje");
-            });
-        }
-        for _ in 0..10 {
-            receiver.recv().expect("Error al recibir el mensaje");
-        }
+        // Request with cookie 
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            _headers: vec![],
+            body: "".to_string(),
+            cookie: Some("abc".to_string()),
+        };
 
-        println!("Prueba de saturación completada.");
+        // Handle cookie
+        let session = server.handle_cookie(&request);
+
+        assert_eq!(session, "abc", "Cookie should be abc");
     }
 
     #[test]
-    fn test_response_time_under_load() {
-        let pool = ThreadPool::new(4);
-        let (sender, receiver) = channel();
-        let start = std::time::Instant::now();
-
-        for i in 0..50 {
-            let sender = sender.clone();
-            pool.execute(move || {
-                thread::sleep(Duration::from_millis(100)); 
-                sender.send(()).expect("Error al enviar el mensaje");
-            });
+    fn test_server_run_single_connection() {
+        let server = Arc::new(Mutex::new(Server::new()));
+        let server_clone = Arc::clone(&server);
+    
+        // Execute on a thread
+        std::thread::spawn(move || {
+            Server::run(server_clone).unwrap();
+        });
+    
+        //Connects with the server
+        match std::net::TcpStream::connect("127.0.0.1:8080") {
+            Ok(mut stream) => {
+                stream.write(b"GET /get.json HTTP/1.1\r\n\r\n").unwrap();
+    
+                let mut buffer = [0; 512];
+                let bytes_read = stream.read(&mut buffer).unwrap();
+                // Verify that has read something from connection
+                assert!(bytes_read > 0);
+            }
+            Err(e) => {
+                panic!("Failed to connect to the server: {:?}", e);
+            }
         }
-
-        for _ in 0..50 {
-            receiver.recv().expect("Error al recibir el mensaje");
-        }
-
-        let duration = start.elapsed();
-        println!("Prueba bajo carga completada en {:?}", duration);
     }
+    
+    #[test]
+    fn test_server_run_multiple_connections() {
+        // Creates a server with shared sessions
+        let server = Arc::new(Mutex::new(Server::new()));
 
-    // #[test]
-    // fn test_error_handling() {
-    //     let pool = ThreadPool::new(4);
-    //     let (sender, receiver) = channel();
+        // Runs the server on a thread
+        let server_clone = Arc::clone(&server);
+        let handle = thread::spawn(move || {
+            Server::run(server_clone).unwrap();
+        });
 
-    //     for i in 0..4 {
-    //         let sender = sender.clone();
-    //         pool.execute(move || {
-    //             if i == 2 {
-    //                 panic!("Error controlado en la tarea {}", i); // Introduce un error controlado
-    //             }
-    //             println!("Tarea {} ejecutada.", i);
-    //             sender.send(()).expect("Error al enviar el mensaje");
-    //         });
-    //     }
-    //     // Observa si los hilos continúan operando después del error
-    //     for _ in 0..4 {
-    //         if receiver.recv().is_err() {
-    //             println!("Se capturó un error.");
-    //         }
-    //     }
+        // Creates multiple simulated conections
+        let clients: Vec<_> = (0..4)
+            .map(|_| {
+                thread::spawn(|| {
+                    let mut stream = TcpStream::connect("127.0.0.1:8080").unwrap();
+                    stream.write(b"GET ./files/get.json HTTP/1.1\r\n\r\n").unwrap();
 
-    //     println!("Prueba de manejo de errores completada.");
-    // }
+                    let mut buffer = [0; 512];
+                    stream.read(&mut buffer).unwrap();
+                    assert!(buffer.starts_with(b"HTTP/1.1"));
+                })
+            })
+            .collect();
+        
+        // Esperar a que todas las conexiones terminen
+        for client in clients {
+            client.join().unwrap();
+        }
+
+        // Detener el servidor
+        handle.join().unwrap();
+    }
 }

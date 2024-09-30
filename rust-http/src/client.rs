@@ -48,6 +48,7 @@ impl Client {
             }
 
             // Log the response
+            
             println!("Sent Response: {}", full_response);
         }
     }
