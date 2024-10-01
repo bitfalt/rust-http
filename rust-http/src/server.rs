@@ -126,7 +126,7 @@ mod tests {
         //Connects with the server
         match std::net::TcpStream::connect("127.0.0.1:8080") {
             Ok(mut stream) => {
-                stream.write(b"GET /get.json HTTP/1.1\r\n\r\n").unwrap();
+                stream.write(b"GET /get HTTP/1.1\r\n\r\n").unwrap();
     
                 let mut buffer = [0; 512];
                 let bytes_read = stream.read(&mut buffer).unwrap();
@@ -155,7 +155,7 @@ mod tests {
             .map(|_| {
                 thread::spawn(|| {
                     let mut stream = TcpStream::connect("127.0.0.1:8080").unwrap();
-                    stream.write(b"GET ./files/get.json HTTP/1.1\r\n\r\n").unwrap();
+                    stream.write(b"GET /get HTTP/1.1\r\n\r\n").unwrap();
 
                     let mut buffer = [0; 512];
                     stream.read(&mut buffer).unwrap();
@@ -163,7 +163,7 @@ mod tests {
                 })
             })
             .collect();
-        
+
         // Esperar a que todas las conexiones terminen
         for client in clients {
             client.join().unwrap();
