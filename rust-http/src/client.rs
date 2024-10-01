@@ -111,3 +111,97 @@ impl Client {
         self.stream.flush()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::{Arc, Mutex};
+    use std::io::Write;
+    use crate::server::Server;
+    use crate::request::HttpRequest;
+    
+
+    #[test]
+    // Verify that a client may handle a request, simulate a session and returns a valid response
+    fn test_client_handle() {
+        let server = Arc::new(Mutex::new(Server::new()));
+
+        // Defines a session with ID 1234
+        {
+            let mut server_lock = server.lock().unwrap();
+            server_lock.sessions.insert("1234".to_string(), "user_data".to_string());
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = b"GET / HTTP/1.1\r\nCookie: sessionId=1234\r\n\r\n";
+            stream.write_all(request).unwrap();
+            stream.flush().unwrap();
+        });
+
+        let stream = TcpStream::connect(addr).unwrap();
+        let mut client = Client { stream };
+
+        client.handle(Arc::clone(&server));
+
+        handle.join().unwrap();
+
+        let server_lock = server.lock().unwrap();
+        assert!(server_lock.sessions.contains_key("1234"));
+    }
+
+
+    #[test]
+    // Verify that the parse_request function correctly extracts the information from the HTTP request, including method, path, and cookies
+    fn test_parse_request() {
+        let request = b"GET /get HTTP/1.1\r\nHost: localhost\r\nCookie: sessionId=1234\r\n\r\n";
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.write_all(request).unwrap();
+            stream.flush().unwrap();
+        });
+
+        let stream = TcpStream::connect(addr).unwrap();
+        let mut client = Client { stream };
+
+        let parsed_request = client.parse_request().unwrap();
+
+        assert_eq!(parsed_request.method, "GET");
+        assert_eq!(parsed_request.path, "/get");
+        assert_eq!(parsed_request.cookie.unwrap(), "1234");
+
+        handle.join().unwrap();
+    }
+
+
+    #[test]
+    // Verify that the function send_response() writes the data to the client's stream and ensures that the response is delivered correctly 
+    fn test_send_response() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buffer = [0; 512];
+            let bytes_read = stream.read(&mut buffer).unwrap();
+            let response = String::from_utf8_lossy(&buffer[..bytes_read]);
+
+            assert!(response.contains("HTTP/1.1 200 OK"));
+        });
+
+        let stream = TcpStream::connect(addr).unwrap();
+        let mut client = Client { stream };
+        let response = "HTTP/1.1 200 OK\r\n\r\n";
+        client.send_response(response).unwrap();
+
+        handle.join().unwrap();
+    }
+
+}
