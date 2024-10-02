@@ -59,3 +59,59 @@ impl HttpResponse {
         response
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_http_response_new() {
+        let status_code = 200;
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), "application/json".to_string());
+        let body = Some(r#"{"message": "Hello, world!"}"#.to_string());
+    
+        // Create a new HttpResponse instance
+        let response = HttpResponse::new(status_code, headers.clone(), body.clone());
+    
+        // Assert: verify the response values
+        assert_eq!(response.status_code, status_code);
+        assert_eq!(response.headers, headers);
+        assert_eq!(response.body, body);
+    }
+
+    #[test]
+    fn test_http_response_to_string_with_body() {
+        // Arrange
+        let status_code = 200;
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), "application/json".to_string());
+        let body = Some(r#"{"message": "Hello, world!"}"#.to_string());
+
+        // Create a new HttpResponse instance
+        let response = HttpResponse::new(status_code, headers, body.clone());
+        let response_string = response.to_string();
+
+        // Assert: verify key parts of the response
+        assert!(response_string.contains("HTTP/1.1 200 OK"));
+        assert!(response_string.contains("Content-Type: application/json"));
+        assert!(response_string.contains(&format!("Content-Length: {}", body.clone().unwrap().len())));
+        assert!(response_string.contains(r#"{"message": "Hello, world!"}"#));
+    }
+
+    #[test]
+    fn test_http_response_to_string_without_body() {
+        let status_code = 204;
+        let headers = HashMap::new();
+        let body = None;
+
+        // Create a new HttpResponse instance
+        let response = HttpResponse::new(status_code, headers, body);
+        let response_string = response.to_string();
+
+        // Assert: verify key parts of the response
+        let expected_response = "HTTP/1.1 204 No Content\r\n\r\n";
+        assert_eq!(response_string, expected_response);
+    }
+}
