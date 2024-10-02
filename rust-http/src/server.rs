@@ -43,7 +43,7 @@ impl Server {
         info!("Server running on port 8080");
 
         // Create a thread pool with 4 threads
-        let pool = ThreadPool::new(4);
+        let pool = ThreadPool::new(100);
 
         for stream in listener.incoming() {
             match stream {
@@ -67,7 +67,6 @@ impl Server {
 #[cfg(test)]
 mod tests {
     use super::*;
-    //use crate::request::HttpRequest;
 
     #[test]
     fn test_new_session_creation_without_cookie() {
@@ -141,35 +140,41 @@ mod tests {
     
     #[test]
     fn test_server_run_multiple_connections() {
-        // Creates a server with shared sessions
         let server = Arc::new(Mutex::new(Server::new()));
-
-        // Runs the server on a thread
         let server_clone = Arc::clone(&server);
-        let handle = thread::spawn(move || {
+    
+        std::thread::spawn(move || {
             Server::run(server_clone).unwrap();
         });
-
-        // Creates multiple simulated conections
-        let clients: Vec<_> = (0..4)
-            .map(|_| {
-                thread::spawn(|| {
-                    let mut stream = TcpStream::connect("127.0.0.1:8080").unwrap();
-                    stream.write(b"GET /get HTTP/1.1\r\n\r\n").unwrap();
-
-                    let mut buffer = [0; 512];
-                    stream.read(&mut buffer).unwrap();
-                    assert!(buffer.starts_with(b"HTTP/1.1"));
-                })
-            })
-            .collect();
-
-        // Esperar a que todas las conexiones terminen
-        for client in clients {
-            client.join().unwrap();
+    
+        // Simulates multiple clients in separate threads
+        let mut handles = vec![];
+        for i in 0..100{
+            let handle = std::thread::spawn(move || {
+                match TcpStream::connect("127.0.0.1:8080") {
+                    Ok(mut stream) => {
+                        let request = format!("GET /get HTTP/1.1\r\n\r\n");
+                        stream.write(request.as_bytes()).unwrap();
+    
+                        let mut buffer = [0; 512];
+                        let bytes_read = stream.read(&mut buffer).unwrap();
+    
+                        assert!(bytes_read > 0);
+                        let response = String::from_utf8_lossy(&buffer[..bytes_read]);
+                        assert!(response.contains("HTTP/1.1 200 OK"));
+                    }
+                    Err(e) => {
+                        panic!("Failed to connect to the server: {:?}", e);
+                    }
+                }
+            });
+    
+            handles.push(handle);
         }
 
-        // Detener el servidor
-        handle.join().unwrap();
+        for handle in handles {
+            handle.join().unwrap();
+        } 
     }
+
 }
