@@ -15,7 +15,7 @@
 
 Este proyecto implementa un servidor HTTP simple desde cero utilizando Rust. El servidor soporta las principales operaciones HTTP (GET, POST, PUT, DELETE, PATCH) y gestiona sesiones de usuario con cookies. Está diseñado para manejar múltiples solicitudes concurrentes utilizando hilos y asegura el acceso seguro a los datos de sesión mediante `Arc` y `Mutex`.
 
-## Pre-requisitos para correr el proyecto
+## Requisitos para correr el proyecto
 
 1. Rust instalado, en caso de no tener Rust se puede instalar siguiendo las instrucciones en este [enlace](https://doc.rust-lang.org/book/ch01-01-installation.html)
 2. Una vez instalado, para correr los tests se corre el siguiente comando.
@@ -62,13 +62,6 @@ El servidor soporta las siguientes operaciones HTTP:
 - **PUT**: Actualiza recursos con los datos proporcionados.
 - **DELETE**: Elimina recursos especificados por la ruta.
 - **PATCH**: Actualiza parcialmente recursos con los datos proporcionados.
-
-## Manejo de Errores y Robustez
-
-El servidor incorpora un manejo básico de errores para gestionar posibles problemas como solicitudes mal formadas, desconexiones de clientes y fallos en el flujo de datos.
-
-- **Solicitudes Mal Formadas**: El servidor verifica si hay solicitudes incompletas o mal formadas y devuelve mensajes de error apropiados.
-
 
 <!-- ## 9. Pruebas del Fixed Thread Pool
 - **Prueba de Creación de Hilos**:
