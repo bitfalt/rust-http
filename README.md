@@ -29,6 +29,19 @@ cd rust-http
 # Levantar servidor
 cargo run
 ```
+4. Para realizar una solicitud se realiza mediante alguna herramienta como `curl`, `Postman` o `APIDog`. La solicitud se realiza a la url `http://localhost:8080/{endpoint}` donde endpoint es el archivo donde se desea realizar la operación.
+
+```bash
+# Ejemplo usando curl
+curl --location --request PATCH 'http://localhost:8080/users/420' \
+--header 'Content-Type: application/json' \
+--header 'Host: localhost:8080' \
+--header 'Connection: keep-alive' \
+--header 'Cookie: sessionId=991a02eb-16c2-48fb-ab87-459b778bca3f' \
+--data-raw '{
+    "key": 212121
+}'
+```
 
 ## Descripción General de la Arquitectura
 
@@ -36,7 +49,7 @@ El servidor está estructurado en tres componentes principales:
 
 **Server**: El `server` se encarga de manejar las cookies y mantiene la conexión abierta, puede procesar hasta 100 requests de manera simultánea al tener 100 hilos en un thread pool estático.\
 **Client**: El `client` se encarga de manejar el request, esto incluye hacer el parsing del mismo y manejar el método del request de manera correcta.\
-**Methods**: `methods` se encarga de manejar los diferentes métodos HTTP (GET, POST, PUT, DELETE, PATCH). La implementación de cada método se realizó para realizar las operaciones correspondientes a los archivos en la carpeta `rust-http/files`.
+**Methods**: `methods` se encarga de manejar los diferentes métodos HTTP (GET, POST, PUT, DELETE, PATCH). La implementación de cada método se realizó para hacer las operaciones correspondientes a los archivos en la carpeta `rust-http/files`.
 
 ## Manejo de Concurrencia (hilos)
 
@@ -138,9 +151,47 @@ Endpoint: `post`
 </div>
 
 #### PUT
+Endpoint: `users/420`
+
+<div align="center">
+   <img src="images/put-request-file-before.png" alt="Figura 11: Archivos antes de PUT Request"/>
+   <p>Figura 11: Archivos antes de PUT Request</p>
+</div>
+
+<div align="center">
+   <img src="images/put-request-apidog.png" alt="Figura 12: PUT Request en APIDog"/>
+   <p>Figura 12: PUT Request en APIDog</p>
+</div>
+
+<div align="center">
+   <img src="images/put-request-cmd.png" alt="Figura 13: PUT Request en servidor"/>
+   <p>Figura 13: PUT Request en servidor</p>
+</div>
+
+<div align="center">
+   <img src="images/put-request-file-after.png" alt="Figura 14: Archivos después de PUT Request"/>
+   <p>Figura 14: Archivos después de PUT Request</p>
+</div>
 
 #### PATCH
+Endpoint: `users/420`
 
+<div align="center">
+   <img src="images/patch-request-file-before.png" alt="Figura 15: Archivos antes de PATCH Request"/>
+   <p>Figura 11: Archivos antes de PATCH Request</p>
+</div>
 
-### Integrartion testing multiple requests
-Para probar que el servidor maneja múltiples requests de manera exitosa, se intentó usar APIDog. Sin embargo, daba problemas de conexión al utilizar muchos hilos. Por lo tanto, se diseñaron las pruebas en esta aplicación para posteriomente exportarlas a [JMeter](https://jmeter.apache.org/).
+<div align="center">
+   <img src="images/patch-request-apidog.png" alt="Figura 16: PATCH Request en APIDog"/>
+   <p>Figura 12: PATCH Request en APIDog</p>
+</div>
+
+<div align="center">
+   <img src="images/patch-request-cmd.png" alt="Figura 17: PATCH Request en servidor"/>
+   <p>Figura 13: PATCH Request en servidor</p>
+</div>
+
+<div align="center">
+   <img src="images/patch-request-file-after.png" alt="Figura 18: Archivos después de PATCH Request"/>
+   <p>Figura 14: Archivos después de PATCH Request</p>
+</div>
