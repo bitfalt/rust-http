@@ -34,7 +34,7 @@ cargo run
 
 El servidor está estructurado en tres componentes principales:
 
-**Server**: El `server` se encarga de manejar las cookies y mantiene la conexión abierta, puede procesar hasta 4 requests de manera simultánea al tener 4 hilos en un thread pool estático.\
+**Server**: El `server` se encarga de manejar las cookies y mantiene la conexión abierta, puede procesar hasta 100 requests de manera simultánea al tener 100 hilos en un thread pool estático.\
 **Client**: El `client` se encarga de manejar el request, esto incluye hacer el parsing del mismo y manejar el método del request de manera correcta.\
 **Methods**: `methods` se encarga de manejar los diferentes métodos HTTP (GET, POST, PUT, DELETE, PATCH). La implementación de cada método se realizó para realizar las operaciones correspondientes a los archivos en la carpeta `rust-http/files`.
 
@@ -42,7 +42,7 @@ El servidor está estructurado en tres componentes principales:
 
 La concurrencia se logra utilizando las características de la biblioteca estándar de Rust:
 
-- **Hilos**: Cada conexión entrante entra al threadpool estático, el cual tiene 4 hilos. Estos hilos se encargan de manejar el request de manera adecuada.
+- **Hilos**: Cada conexión entrante entra al threadpool estático, el cual tiene 100 hilos. Estos hilos se encargan de manejar el request de manera adecuada.
 - **Datos Compartidos**: Se utiliza el patrón `Arc<Mutex<Server>>` para compartir de forma segura el acceso a los datos de sesión del servidor entre hilos. `Arc` permite múltiples propietarios, y `Mutex` asegura que solo un hilo pueda acceder o modificar los datos a la vez.
 
 ## Manejo de Cookies (sesiones)
@@ -63,60 +63,31 @@ El servidor soporta las siguientes operaciones HTTP:
 - **DELETE**: Elimina recursos especificados por la ruta.
 - **PATCH**: Actualiza parcialmente recursos con los datos proporcionados.
 
-<!-- ## 9. Pruebas del Fixed Thread Pool
-- **Prueba de Creación de Hilos**:
-      Objetivo:
-      Verificar que el Fixed Thread Pool crea hilos solo hasta el límite establecido y reutiliza los hilos existentes para nuevas solicitudes.
+## Tests
+### Unit testing
+Se crearon 27 tests para probar todas las funciones del servidor y asegurar su funcionamiento.
 
-      Procedimiento:
-         1. Configura el pool con un tamaño fijo, por ejemplo, 4 hilos: let pool = ThreadPool::new(4);.
-         2. Inicia el servidor.
-         3. Envía múltiples solicitudes (más de 4) concurrentemente usando curl o una herramienta similar:
-   
-      Resultado Esperado:
-      Solo se crean 4 hilos, y estos se reutilizan para manejar todas las solicitudes, sin crear hilos adicionales. 
-   <div align="center">
-      <img src="images/Prueba1Thread.png" alt="Figura 1: Resultado Prueba de creación de hilos" />
-      <p>Figura 1: Resultado Prueba de creación de hilos</p>
-   </div>
-- **Prueba de Saturación del Pool**:
-      Objetivo:
-      Evaluar cómo responde el pool cuando todas las threads están ocupadas y llegan más solicitudes.
+<div align="center">
+   <img src="images/unit-testing.png" alt="Figura 1: Resultado Unit Testing"/>
+   <p>Figura 1: Resultado Unit Testing</p>
+</div>
 
-      Procedimiento:
-         1. Envía 10 solicitudes concurrentes rápidas
+Todos los tests pasan de manera exitosa.
 
-      Resultado Esperado:
-      Las primeras 4 solicitudes se procesan inmediatamente; las demás se encolan y se procesan a medida que los hilos se desocupan.
-   <div align="center">
-      <img src="images/Prueba2Thread.png" alt="Figura 2: Resultado Prueba de saturación del Pool" />
-      <p>Figura 2: Resultado Prueba de saturación del Pool</p>
-   </div>
+### Unit testing coverage
+Se utilizó el paquete de `cargo-llvm-cov`, el cual se puede encontrar [aquí](https://lib.rs/crates/cargo-llvm-cov).
+<div align="center">
+   <img src="images/tests-coverage.png" alt="Figura 2: Resultados Unit Testing Coverage"/>
+   <p>Figura 2: Resultados Unit Testing Coverage</p>
+</div>
 
-- **Prueba de Tiempo de Respuesta Bajo Carga**:
-      Objetivo:
-      Medir el tiempo que toma completar 50 tareas cuando el pool tiene 4 hilos.
+Según la herramienta, se logró un coverage de un 100% de las funciones, sin embargo, solamente se logró un 74.04% de coverage en las regiones y un 85.42% de coverages en las líneas.
 
-      Procedimiento:
-         1. Se envían 50 tareas, cada una simulando un trabajo de 100 milisegundos.
+Por lo tanto, concluimos que se obtuvo un coverage promedio de 86.48%.
 
-      Resultado Esperado:
-      Las tareas deberían completarse en un tiempo aproximado de 5 segundos, considerando la limitación de hilos.
-   <div align="center">
-      <img src="images/Prueba3Thread.png" alt="Figura 3: Resultado Prueba de Tiempo de Respuesta Bajo Carga" />
-      <p>Figura 3: Resultado Prueba de Tiempo de Respuesta Bajo Carga</p>
-   </div>
+### Integration testing single request
+Para probar que el servidor funciona de manera exitosa se usó la aplicación de [APIDog](https://apidog.com/) para enviar los diferentes requests
 
-- **Prueba de Manejo de Errores**:
-      Objetivo:
-      Verificar que el pool continúa operando después de que se produce un error controlado en una tarea
 
-      Procedimiento:
-         1. Se envían 4 tareas, donde una de ellas provoca un pánico controlado.
-
-      Resultado Esperado:
-      La prueba debería capturar el error y permitir que las otras tareas se ejecuten correctamente.
-   <div align="center">
-      <img src="images/Prueba4Thread.png" alt="Figura 4: Resultado Prueba de Manejo de Errores" />
-      <p>Figura 4: Resultado Prueba de TManejo de Errores</p>
-   </div> -->
+### Integrartion testing multiple requests
+Para probar que el servidor maneja múltiples requests de manera exitosa, se intentó usar APIDog. Sin embargo, daba problemas de conexión al utilizar muchos hilos. Por lo tanto, se diseñaron las pruebas en esta aplicación para posteriomente exportarlas a [JMeter](https://jmeter.apache.org/).
