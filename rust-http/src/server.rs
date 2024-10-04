@@ -40,7 +40,7 @@ impl Server {
 
     pub fn run(server: Arc<Mutex<Server>>) -> Result<(), Box<dyn std::error::Error>> {
         let listener = TcpListener::bind("127.0.0.1:8080")?;
-        info!("Server running on port 8080");
+        println!("Server running on localhost:8080");
 
         // Create a thread pool with 4 threads
         let pool = ThreadPool::new(100);
@@ -54,7 +54,7 @@ impl Server {
                         client.handle(server_clone);
                     });
                 }
-                Err(e) => error!("Connection failed: {}", e),
+                Err(e) => println!("Connection failed: {}", e),
             }
         }
 
