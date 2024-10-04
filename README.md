@@ -88,6 +88,59 @@ Por lo tanto, concluimos que se obtuvo un coverage promedio de 86.48%.
 ### Integration testing single request
 Para probar que el servidor funciona de manera exitosa se usó la aplicación de [APIDog](https://apidog.com/) para enviar los diferentes requests
 
+#### GET
+Endpoint: `get`
+
+<div align="center">
+   <img src="images/get-request-apidog.png" alt="Figura 3: GET Request en APIDog"/>
+   <p>Figura 3: GET Request en APIDog</p>
+</div>
+
+<div align="center">
+   <img src="images/get-request-cmd.png" alt="Figura 4: GET Request en servidor"/>
+   <p>Figura 4: GET Request en servidor</p>
+</div>
+
+#### POST
+Endpoint: `post`
+
+<div align="center">
+   <img src="images/post-request-apidog.png" alt="Figura 5: POST Request en APIDog"/>
+   <p>Figura 5: POST Request en APIDog</p>
+</div>
+
+<div align="center">
+   <img src="images/post-request-cmd.png" alt="Figura 6: POST Request en servidor"/>
+   <p>Figura 6: POST Request en servidor</p>
+</div>
+
+<div align="center">
+   <img src="images/post-request-files.png" alt="Figura 7: Archivos POST Request"/>
+   <p>Figura 7: Archivos POST Request</p>
+</div>
+
+#### DELETE
+Endpoint: `post`
+
+<div align="center">
+   <img src="images/delete-request-apidog.png" alt="Figura 8: DELETE Request en APIDog"/>
+   <p>Figura 8: POST Request en APIDog</p>
+</div>
+
+<div align="center">
+   <img src="images/delete-request-cmd.png" alt="Figura 9: DELETE Request en servidor"/>
+   <p>Figura 9: POST Request en servidor</p>
+</div>
+
+<div align="center">
+   <img src="images/post-request-files.png" alt="Figura 10: Archivos DELETE Request"/>
+   <p>Figura 10: Archivos POST Request</p>
+</div>
+
+#### PUT
+
+#### PATCH
+
 
 ### Integrartion testing multiple requests
 Para probar que el servidor maneja múltiples requests de manera exitosa, se intentó usar APIDog. Sin embargo, daba problemas de conexión al utilizar muchos hilos. Por lo tanto, se diseñaron las pruebas en esta aplicación para posteriomente exportarlas a [JMeter](https://jmeter.apache.org/).
