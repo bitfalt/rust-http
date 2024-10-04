@@ -195,3 +195,17 @@ Endpoint: `users/420`
    <img src="images/patch-request-file-after.png" alt="Figura 18: Archivos después de PATCH Request"/>
    <p>Figura 14: Archivos después de PATCH Request</p>
 </div>
+
+### Integration testing multiple requests
+Para probar que el servidor maneja múltiples requests de manera exitosa, se intentó usar APIDog. Sin embargo, daba problemas de conexión al utilizar muchos hilos. Por lo tanto, se diseñaron las pruebas en esta aplicación para posteriomente exportarlas a [JMeter](https://jmeter.apache.org/).
+
+Una breve corrida de prueba se muestra a continuación:
+
+`Method: PATCH`\
+`Endpoint: /users/420`\
+`Threads: 200`
+
+<div align="center">
+   <img src="images/thread-testing-jmeter.png" alt="Figura 19: JMeter PATCH Request"/>
+   <p>Figura 19: JMeter PATCH Request</p>
+</div>
